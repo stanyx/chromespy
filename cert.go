@@ -1,4 +1,4 @@
-package server
+package browzer
 
 import (
 	"crypto"
@@ -13,28 +13,23 @@ import (
 )
 
 func GetTLSConfig(root tls.Certificate) (*tls.Config, error) {
-	root_cert, err := getRootCert(root)
+
+	rootCert, err := x509.ParseCertificate(root.Certificate[0])
 	if err != nil {
 		return nil, fmt.Errorf("bad local cert: %v", err)
 	}
-	tp := &tlsProxy{&root, root_cert, sync.Mutex{}, nil}
-	return &tls.Config{
+	rootCert.IsCA = true
+	rootCert.BasicConstraintsValid = true
+
+	tp := &tlsProxy{&root, rootCert, sync.Mutex{}, nil}
+	cfg := &tls.Config{
 		GetConfigForClient: tp.getRecordConfigForClient,
-	}, nil
-}
-
-func getRootCert(root tls.Certificate) (*x509.Certificate, error) {
-	root_cert, err := x509.ParseCertificate(root.Certificate[0])
-	if err != nil {
-		return nil, err
 	}
-	root_cert.IsCA = true
-	root_cert.BasicConstraintsValid = true
-	return root_cert, nil
+
+	return cfg, nil
 }
 
-// Mints a dummy server cert when the real one is not recorded.
-func MintDummyCertificate(serverName string, rootCert *x509.Certificate, rootKey crypto.PrivateKey) ([]byte, string, error) {
+func mintServerCert(serverName string, rootCert *x509.Certificate, rootKey crypto.PrivateKey) ([]byte, string, error) {
 	template := rootCert
 	if ip := net.ParseIP(serverName); ip != nil {
 		template.IPAddresses = []net.IP{ip}
@@ -107,23 +102,27 @@ func buildNextProtos(negotiatedProtocol string) []string {
 }
 
 func (tp *tlsProxy) getRecordConfigForClient(clientHello *tls.ClientHelloInfo) (*tls.Config, error) {
-	h := clientHello.ServerName
-	if h == "" {
+
+	if clientHello.ServerName == "" {
 		return &tls.Config{
 			Certificates: []tls.Certificate{*tp.root},
 		}, nil
 	}
 
-	derBytes, negotiatedProtocol, err := MintServerCert(h, tp.root_cert, tp.root.PrivateKey)
+	derBytes, negotiatedProtocol, err := mintServerCert(clientHello.ServerName, tp.root_cert, tp.root.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("create cert failed: %v", err)
 	}
 
-	return &tls.Config{
+	cfg := &tls.Config{
 		Certificates: []tls.Certificate{
 			tls.Certificate{
 				Certificate: [][]byte{derBytes},
-				PrivateKey:  tp.root.PrivateKey}},
+				PrivateKey:  tp.root.PrivateKey,
+			},
+		},
 		NextProtos: buildNextProtos(negotiatedProtocol),
-	}, nil
+	}
+
+	return cfg, nil
 }
