@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/stanyx/browzer"
+	"github.com/stanyx/chromespy"
 )
 
 func main() {
@@ -54,6 +54,7 @@ func main() {
 			KeyFile:  keyFile,
 			Interceptors: []browzer.RequestInterceptor{
 				func(req *http.Request, resp *http.Response) {
+					//log.Println(req)
 					if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 						if strings.Contains(req.URL.String(), domain) {
 							log.Printf("\nredirect: %+v", req)

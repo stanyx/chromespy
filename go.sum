@@ -1,3 +1,7 @@
+github.com/stanyx/browzer v0.0.0-20200220125129-ac96353814f4 h1:zcRPpIo0AsLKr6F7iS/Lr1tULy6YHuQxpx5rh+G8qjI=
+github.com/stanyx/browzer v0.0.0-20200220125129-ac96353814f4/go.mod h1:IMCsnN2QZQpRUlZG7xm+uu9eXF/KWh18ebCkZPebAQ0=
+gitlab.fix.ru/vendors/browzer v0.0.0-20200228163330-0f41c199263d h1:TI4MzFYeA+593jQOf5UBaTFou+fz+2GBlHCttq1Afhc=
+gitlab.fix.ru/vendors/browzer v0.0.0-20200228163330-0f41c199263d/go.mod h1:5AhNcZtgpBSDSE9L/FxiExypDgKlwooVWaFoTj0hqHM=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/net v0.0.0-20200202094626-16171245cfb2 h1:CCH4IOTTfewWjGOlSp+zGcjutRKlBEZQ6wTn8ozI/nI=
 golang.org/x/net v0.0.0-20200202094626-16171245cfb2/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=

@@ -53,11 +53,14 @@ type Browzer struct {
 
 // NewRecordingProxy constructs an HTTP proxy that records responses into an archive.
 // The proxy is listening for requests on a port that uses the given scheme (e.g., http, https).
-func NewRecordingProxy(scheme string, subProxyURL string) *recordingProxy {
+func NewRecordingProxy(scheme string, subProxyURL string) (*recordingProxy, error) {
 	transport := http.DefaultTransport.(*http.Transport)
 
 	if subProxyURL != "" {
-		proxyURL, _ := url.Parse("socks5://" + subProxyURL)
+		proxyURL, err := url.Parse(subProxyURL)
+		if err != nil {
+			return nil, err
+		}
 		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 
@@ -66,7 +69,7 @@ func NewRecordingProxy(scheme string, subProxyURL string) *recordingProxy {
 		scheme,
 		[]ResponseTransformer{},
 		[]RequestInterceptor{},
-	}
+	}, nil
 }
 
 // ResponseTransformer is an interface for transforming HTTP responses.
@@ -111,7 +114,7 @@ func (proxy *recordingProxy) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 	fixupRequestURL(req, proxy.scheme)
 
-	logf := makeLogger(req, false)
+	logf := makeLogger(req, true)
 
 	if req.ContentLength == 0 {
 		req.Body = nil
@@ -160,19 +163,11 @@ func (proxy *recordingProxy) ServeHTTP(w http.ResponseWriter, req *http.Request)
 		req.Body = ioutil.NopCloser(bytes.NewReader(requestBody))
 	}
 
-	// Restore req and response body which are consumed by RecordRequest.
-	if req.Body != nil {
-		req.Body = ioutil.NopCloser(bytes.NewReader(requestBody))
-	}
-	resp.Body = ioutil.NopCloser(bytes.NewReader(responseBody))
-
 	responseBodyAfterTransform, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logf("warning: transformed response truncated: %v", err)
 	}
 
-	// Forward the response.
-	//logf("serving %d, %d bytes", resp.StatusCode, len(responseBodyAfterTransform))
 	for k, v := range resp.Header {
 		w.Header()[k] = append([]string{}, v...)
 	}
@@ -216,14 +211,24 @@ type Server struct {
 
 func (s *Server) Serve(cfg Config) error {
 
-	proxyAddr := net.JoinHostPort(cfg.Proxy.Host, strconv.Itoa(cfg.Proxy.Port))
+	var proxyAddr string
+	if cfg.Proxy.Host != "" && cfg.Proxy.Port > 0 {
+		proxyAddr = net.JoinHostPort(cfg.Proxy.Host, strconv.Itoa(cfg.Proxy.Port))
+	}
+
 	httpAddr := net.JoinHostPort(cfg.Http.Host, strconv.Itoa(cfg.Http.Port))
 	httpsAddr := net.JoinHostPort(cfg.Https.Host, strconv.Itoa(cfg.Https.Port))
 
-	log.Printf("serving, http=%v, htts=%v, proxy=%v\n", httpAddr, httpsAddr, proxyAddr)
+	log.Printf("serving, http=%v, https=%v, proxy=%v\n", httpAddr, httpsAddr, proxyAddr)
 
-	httpHandler := NewRecordingProxy("http", proxyAddr)
-	httpsHandler := NewRecordingProxy("https", proxyAddr)
+	httpHandler, err := NewRecordingProxy("http", proxyAddr)
+	if err != nil {
+		return err
+	}
+	httpsHandler, err := NewRecordingProxy("https", proxyAddr)
+	if err != nil {
+		return err
+	}
 
 	for _, i := range cfg.Interceptors {
 		httpHandler.WithInterceptor(i)
@@ -292,7 +297,10 @@ func (s *Server) Serve(cfg Config) error {
 					writeError(errCh, err)
 					return
 				}
-				http2.ConfigureServer(s.Server, &http2.Server{})
+				if err := http2.ConfigureServer(s.Server, &http2.Server{}); err != nil {
+					writeError(errCh, err)
+					return
+				}
 				tlsListener := tls.NewListener(tcpKeepAliveListener{ln.(*net.TCPListener)}, s.TLSConfig)
 				log.Println("https server started")
 				err = s.Serve(tlsListener)

@@ -1,3 +1,3 @@
-# BROWZER
+# CHROMESPY
 
-Request logger for capturing Chrome browser events  
+Request logger for capturing Chrome browser events
