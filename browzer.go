@@ -111,7 +111,7 @@ func (proxy *recordingProxy) ServeHTTP(w http.ResponseWriter, req *http.Request)
 
 	fixupRequestURL(req, proxy.scheme)
 
-	logf := makeLogger(req, false)
+	logf := makeLogger(req, true)
 
 	if req.ContentLength == 0 {
 		req.Body = nil
